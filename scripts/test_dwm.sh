@@ -1,8 +1,10 @@
 #!/bin/sh
 DISPLAY_NUM=1
 DISPLAY_SIZE=800x600
-SCRIPT_PATH=$(realpath "$0")
-DWM_SOURCE_CODE_ROOT_PATH=$(realpath $(dirname $(realpath $(dirname "$SCRIPT"))))
+SCRIPT_PARENT_DIR_PATH=$(dirname $(realpath "$0"))
+cd $SCRIPT_PARENT_DIR_PATH
+cd ..
+DWM_SOURCE_CODE_ROOT_PATH=$(pwd)
 DWM_BIN_PATH="$DWM_SOURCE_CODE_ROOT_PATH/dwm"
 recompile_flag=false
 
@@ -13,7 +15,6 @@ while getopts 'r' flag; do
 done
 
 if [ $recompile_flag = true ]; then
-  cd $DWM_SOURCE_CODE_ROOT_PATH
   make clean
   make
 fi
