@@ -21,5 +21,5 @@ fi
 
 Xephyr -br -ac -noreset -screen $DISPLAY_SIZE :$DISPLAY_NUM &
 sleep 1
-DISPLAY=:$DISPLAY_NUM $DWM_BIN_PATH
+DISPLAY=:$DISPLAY_NUM $DWM_BIN_PATH -d
 

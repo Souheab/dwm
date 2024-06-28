@@ -36,6 +36,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xproto.h>
 #include <X11/Xutil.h>
+#include <stdbool.h>
 #ifdef XINERAMA
 #include <X11/extensions/Xinerama.h>
 #endif /* XINERAMA */
@@ -66,6 +67,9 @@ enum { NetSupported, NetWMName, NetWMState, NetWMCheck,
 enum { WMProtocols, WMDelete, WMState, WMTakeFocus, WMLast }; /* default atoms */
 enum { ClkTagBar, ClkLtSymbol, ClkStatusText, ClkWinTitle,
        ClkClientWin, ClkRootWin, ClkLast }; /* clicks */
+
+/* dwm settings */
+static bool debug = false;
 
 typedef union {
 	int i;
@@ -179,6 +183,7 @@ static void grabkeys(void);
 static void incnmaster(const Arg *arg);
 static void keypress(XEvent *e);
 static void killclient(const Arg *arg);
+static void logdebug(char* str);
 static void manage(Window w, XWindowAttributes *wa);
 static void mappingnotify(XEvent *e);
 static void maprequest(XEvent *e);
@@ -188,6 +193,7 @@ static void movemouse(const Arg *arg);
 static Client *nexttiled(Client *c);
 static void pop(Client *c);
 static void propertynotify(XEvent *e);
+static void printselclientinfo(void);
 static void quit(const Arg *arg);
 static Monitor *recttomon(int x, int y, int w, int h);
 static void resize(Client *c, int x, int y, int w, int h, int interact);
@@ -812,6 +818,7 @@ focus(Client *c)
 		XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
 	}
 	selmon->sel = c;
+  printselclientinfo();
 	drawbars();
 }
 
@@ -1030,6 +1037,11 @@ killclient(const Arg *arg)
 		XSetErrorHandler(xerror);
 		XUngrabServer(dpy);
 	}
+}
+
+void
+logdebug(char* str){
+  printf("DEBUG LOG: %s", str);
 }
 
 void
@@ -1257,6 +1269,22 @@ propertynotify(XEvent *e)
 		if (ev->atom == netatom[NetWMWindowType])
 			updatewindowtype(c);
 	}
+}
+
+void
+printselclientinfo() {
+  Client *c = selmon->sel;
+  if (c == NULL) {
+    logdebug("No selected client\n");
+    return;
+  } else {
+    logdebug("Selected client info:\n");
+    printf("  Name: %s\n", c->name);
+    printf("  X: %d\n", c->x);
+    printf("  Y: %d\n", c->y);
+    printf("  W: %d\n", c->w);
+    printf("  H: %d\n", c->h);
+  }
 }
 
 void
@@ -1698,32 +1726,31 @@ tagmon(const Arg *arg)
 	sendmon(selmon->sel, dirtomon(arg->i));
 }
 
-void
-tile(Monitor *m)
-{
-	unsigned int i, n, h, mw, my, ty;
-	Client *c;
+void tile(Monitor *m) {
+  unsigned int i, n, h, mw, my, ty;
+  Client *c;
 
-	for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
-	if (n == 0)
-		return;
+  for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++)
+    ;
+  if (n == 0)
+    return;
 
-	if (n > m->nmaster)
-		mw = m->nmaster ? m->ww * m->mfact : 0;
-	else
-		mw = m->ww - m->gappx;
-	for (i = 0, my = ty = m->gappx, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
-			if (i < m->nmaster) {
-			h = (m->wh - my) / (MIN(n, m->nmaster) - i) - m->gappx;
-			resize(c, m->wx + m->gappx, m->wy + my, mw - (2*c->bw) - m->gappx, h - (2*c->bw), 0);
-			if (my + HEIGHT(c) + m->gappx < m->wh)
-				my += HEIGHT(c) + m->gappx;
-		} else {
-			h = (m->wh - ty) / (n - i) - m->gappx;
-			resize(c, m->wx + mw + m->gappx, m->wy + ty, m->ww - mw - (2*c->bw) - 2*m->gappx, h - (2*c->bw), 0);
-			if (ty + HEIGHT(c) + m->gappx < m->wh)
-				ty += HEIGHT(c) + m->gappx;
-		}
+  if (n > m->nmaster)
+    mw = m->nmaster ? m->ww * m->mfact : 0;
+  else
+    mw = m->ww - m->gappx;
+  for (i = 0, my = ty = m->gappx, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
+    if (i < m->nmaster) {
+      h = (m->wh - my) / (MIN(n, m->nmaster) - i) - m->gappx;
+      resize(c, m->wx + m->gappx, m->wy + my, mw - (2 * c->bw) - m->gappx, h - (2 * c->bw), 0);
+      if (my + HEIGHT(c) + m->gappx < m->wh)
+        my += HEIGHT(c) + m->gappx;
+    } else {
+      h = (m->wh - ty) / (n - i) - m->gappx;
+      resize(c, m->wx + mw + m->gappx, m->wy + ty, m->ww - mw - (2 * c->bw) - 2 * m->gappx, h - (2 * c->bw), 0);
+      if (ty + HEIGHT(c) + m->gappx < m->wh)
+        ty += HEIGHT(c) + m->gappx;
+    }
 }
 
 void
@@ -2166,8 +2193,11 @@ main(int argc, char *argv[])
 {
 	if (argc == 2 && !strcmp("-v", argv[1]))
 		die("dwm-"VERSION);
+  else if (argc == 2 && !strcmp("-d", argv[1])) {
+    debug = true;
+  }
 	else if (argc != 1)
-		die("usage: dwm [-v]");
+		die("usage: dwm [-v | -d]");
 	if (!setlocale(LC_CTYPE, "") || !XSupportsLocale())
 		fputs("warning: no locale support\n", stderr);
 	if (!(dpy = XOpenDisplay(NULL)))
