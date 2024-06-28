@@ -174,16 +174,25 @@ static void focus(Client *c);
 static void focusin(XEvent *e);
 static void focusmon(const Arg *arg);
 static void focusstack(const Arg *arg);
+static void focusup();
+static void focusdown();
+static void focusleft();
+static void focusright();
 static Atom getatomprop(Client *c, Atom prop);
 static int getrootptr(int *x, int *y);
 static long getstate(Window w);
 static int gettextprop(Window w, Atom atom, char *text, unsigned int size);
+static Client *getupclient(Client *c);
+static Client *getdownclient(Client *c);
+static Client *getleftclient(Client *c);
+static Client *getrightclient(Client *c);
 static void grabbuttons(Client *c, int focused);
 static void grabkeys(void);
 static void incnmaster(const Arg *arg);
 static void keypress(XEvent *e);
 static void killclient(const Arg *arg);
 static void logdebug(char* str);
+static void logdebugf(char* str, ...);
 static void manage(Window w, XWindowAttributes *wa);
 static void mappingnotify(XEvent *e);
 static void maprequest(XEvent *e);
@@ -191,9 +200,11 @@ static void monocle(Monitor *m);
 static void motionnotify(XEvent *e);
 static void movemouse(const Arg *arg);
 static Client *nexttiled(Client *c);
+static bool onlyclient(Client *c);
 static void pop(Client *c);
 static void propertynotify(XEvent *e);
 static void printselclientinfo(void);
+static void printselmoninfo(void);
 static void quit(const Arg *arg);
 static Monitor *recttomon(int x, int y, int w, int h);
 static void resize(Client *c, int x, int y, int w, int h, int interact);
@@ -872,6 +883,54 @@ focusstack(const Arg *arg)
 	}
 }
 
+void
+focusup()
+{
+  Client *c = selmon->sel;
+  if (c != NULL) {
+    Client *newc = getupclient(c);
+    if (newc != c) {
+      focus(newc);
+    }
+  }
+} 
+
+void
+focusdown()
+{
+  Client *c = selmon->sel;
+  if (c != NULL) {
+    Client *newc = getdownclient(c);
+    if (newc != c) {
+      focus(newc);
+    }
+  }
+}
+
+void
+focusleft()
+{
+  Client *c = selmon->sel;
+  if (c != NULL) {
+    Client *newc = getleftclient(c);
+    if (newc != c) {
+      focus(newc);
+    }
+  }
+} 
+
+void
+focusright()
+{
+  Client *c = selmon->sel;
+  if (c != NULL) {
+    Client *newc = getrightclient(c);
+    if (newc != c) {
+      focus(newc);
+    }
+  }
+} 
+
 Atom
 getatomprop(Client *c, Atom prop)
 {
@@ -937,6 +996,117 @@ gettextprop(Window w, Atom atom, char *text, unsigned int size)
 	text[size - 1] = '\0';
 	XFree(name.value);
 	return 1;
+}
+
+Client
+*getupclient(Client *c)
+{
+  Client *iter;
+  Client *temp;
+  Client *bestCandidate = c;
+
+  if (onlyclient(c))
+    return c;
+
+  for (iter = selmon->clients; iter; iter = iter->next) {
+    if (iter == c)
+      continue;
+    if (!ISVISIBLE(iter))
+      continue;
+
+    temp = getdownclient(iter);
+    if (temp == c) {
+      bestCandidate = iter;
+      break;
+    }
+  }
+
+  return bestCandidate;
+}
+
+Client
+*getdownclient(Client *c)
+{
+  int targetx = c->x;
+  int targety = c->y + c->h + gappx + (2*borderpx);
+  Client *iter;
+  Client *bestCandidate = c;
+
+  if (onlyclient(c))
+    return c;
+
+  for (iter = selmon->clients; iter; iter = iter->next) {
+    if (iter == c)
+      continue;
+    if (!ISVISIBLE(iter))
+      continue;
+    if (iter->x == targetx && iter->y == targety) {
+      bestCandidate = iter;
+      break;
+    }
+  }
+
+  return bestCandidate;
+}
+
+#define DEVIATION_INIT_CONST 999999
+
+Client *getleftclient(Client *c) {
+  Client *iter;
+  Client *bestCandidate = c;
+  int yDev;
+  int bestYDev = DEVIATION_INIT_CONST;
+
+  if (onlyclient(c))
+    return c;
+
+  for (iter = selmon->clients; iter; iter = iter->next) {
+    if (iter->x >= c->x)
+      continue;
+    if (!ISVISIBLE(c))
+      continue;
+
+    yDev = abs(c->y - iter->y);
+    if (yDev < bestYDev) {
+      bestYDev = yDev;
+      bestCandidate = iter;
+    }
+  }
+
+  return bestCandidate;
+}
+
+Client
+*getrightclient(Client *c) {
+  int targetx = c->x + c->w + gappx + (2*borderpx);
+  Client *iter;
+  Client *bestCandidate = c;
+  int bestYDev = DEVIATION_INIT_CONST; // Best y deviation (least deviation)
+  int yDev;
+
+  if (onlyclient(c)) {
+    logdebug("Only one client on screen\n");
+    return c;
+  }
+
+  for (iter = selmon->clients; iter; iter = iter->next) {
+    if (iter == c)
+      continue;
+    if (!ISVISIBLE(iter))
+      continue;
+    if (iter->x == targetx) {
+      yDev = abs(c->y - iter->y);
+      printf("ydev: %d", yDev);
+
+      if (yDev < bestYDev) {
+        bestYDev = yDev;
+        bestCandidate = iter;
+      }
+    }
+  }
+
+  logdebug("getrightclient finished execution");
+  return bestCandidate;
 }
 
 void
@@ -1041,7 +1211,20 @@ killclient(const Arg *arg)
 
 void
 logdebug(char* str){
-  printf("DEBUG LOG: %s", str);
+  if (debug)
+    printf("DEBUG LOG: %s", str);
+}
+
+void
+logdebugf(char* str, ...) {
+  if (debug) {
+    va_list args;
+    va_start(args, str);
+    printf("DEBUG LOG: ");
+    vprintf(str, args);
+    printf("\n");
+    va_end(args);
+  }
 }
 
 void
@@ -1225,6 +1408,11 @@ nexttiled(Client *c)
 	return c;
 }
 
+bool
+onlyclient(Client *c) {
+  return ((c->h + (2*borderpx) + (2*gappx)) >= selmon->wh) && ((c->w + (2*borderpx) + (2*gappx)) >= selmon->ww);
+}
+
 void
 pop(Client *c)
 {
@@ -1285,6 +1473,15 @@ printselclientinfo() {
     printf("  W: %d\n", c->w);
     printf("  H: %d\n", c->h);
   }
+}
+
+void
+printselmoninfo() {
+  logdebug("Selected monitor info:\n");
+  printf("  wx: %d\n", selmon->wx);
+  printf("  wy: %d\n", selmon->wy);
+  printf("  ww: %d\n", selmon->ww);
+  printf("  wh: %d\n", selmon->wh);
 }
 
 void
@@ -2204,6 +2401,9 @@ main(int argc, char *argv[])
 		die("dwm: cannot open display");
 	checkotherwm();
 	setup();
+  if (debug) {
+    printselmoninfo();
+  }
 #ifdef __OpenBSD__
 	if (pledge("stdio rpath proc exec", NULL) == -1)
 		die("pledge");
