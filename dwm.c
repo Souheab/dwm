@@ -193,6 +193,9 @@ static void keypress(XEvent *e);
 static void killclient(const Arg *arg);
 static void logdebug(char* str);
 static void logdebugf(char* str, ...);
+static void logselclientinfo(void);
+static void logselmoninfo(void);
+static void logselmonclients(void);
 static void manage(Window w, XWindowAttributes *wa);
 static void mappingnotify(XEvent *e);
 static void maprequest(XEvent *e);
@@ -203,8 +206,6 @@ static Client *nexttiled(Client *c);
 static bool onlyclient(Client *c);
 static void pop(Client *c);
 static void propertynotify(XEvent *e);
-static void printselclientinfo(void);
-static void printselmoninfo(void);
 static void quit(const Arg *arg);
 static Monitor *recttomon(int x, int y, int w, int h);
 static void resize(Client *c, int x, int y, int w, int h, int interact);
@@ -225,6 +226,11 @@ static void setup(void);
 static void seturgent(Client *c, int urg);
 static void showhide(Client *c);
 static void spawn(const Arg *arg);
+static void swapclients(Client *c1, Client *c2);
+static void swapup();
+static void swapdown();
+static void swapleft();
+static void swapright();
 static void tag(const Arg *arg);
 static void tagmon(const Arg *arg);
 static void tile(Monitor *m);
@@ -829,7 +835,7 @@ focus(Client *c)
 		XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
 	}
 	selmon->sel = c;
-  printselclientinfo();
+  logselclientinfo();
 	drawbars();
 }
 
@@ -1460,7 +1466,7 @@ propertynotify(XEvent *e)
 }
 
 void
-printselclientinfo() {
+logselclientinfo() {
   Client *c = selmon->sel;
   if (c == NULL) {
     logdebug("No selected client\n");
@@ -1476,12 +1482,29 @@ printselclientinfo() {
 }
 
 void
-printselmoninfo() {
-  logdebug("Selected monitor info:\n");
-  printf("  wx: %d\n", selmon->wx);
-  printf("  wy: %d\n", selmon->wy);
-  printf("  ww: %d\n", selmon->ww);
-  printf("  wh: %d\n", selmon->wh);
+logselmoninfo() {
+  if (debug) {
+    logdebug("Selected monitor info:\n");
+    printf("  wx: %d\n", selmon->wx);
+    printf("  wy: %d\n", selmon->wy);
+    printf("  ww: %d\n", selmon->ww);
+    printf("  wh: %d\n", selmon->wh);
+  }
+}
+
+void
+logselmonclients() {
+  if (debug) {
+    logdebug("Selected monitor clients: [");
+    Client *c;
+    for (c = selmon->clients; c; c = c->next) {
+      printf("{");
+      printf("Name: %s, ", c->name);
+      printf("address: %p", c);
+      printf("}, ");
+    }
+    printf("\n");
+  }
 }
 
 void
@@ -1883,26 +1906,88 @@ showhide(Client *c)
 	}
 }
 
+void spawn(const Arg *arg) {
+  struct sigaction sa;
+
+  if (arg->v == dmenucmd)
+    dmenumon[0] = '0' + selmon->num;
+  if (fork() == 0) {
+    if (dpy)
+      close(ConnectionNumber(dpy));
+    setsid();
+
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sa.sa_handler = SIG_DFL;
+    sigaction(SIGCHLD, &sa, NULL);
+
+    execvp(((char **)arg->v)[0], (char **)arg->v);
+    die("dwm: execvp '%s' failed:", ((char **)arg->v)[0]);
+  }
+}
+
 void
-spawn(const Arg *arg)
-{
-	struct sigaction sa;
+swapclients(Client *c1, Client *c2) {
+  if (c1 == c2)
+    return;
 
-	if (arg->v == dmenucmd)
-		dmenumon[0] = '0' + selmon->num;
-	if (fork() == 0) {
-		if (dpy)
-			close(ConnectionNumber(dpy));
-		setsid();
+  if (c1 == NULL || c2 == NULL)
+    return;
 
-		sigemptyset(&sa.sa_mask);
-		sa.sa_flags = 0;
-		sa.sa_handler = SIG_DFL;
-		sigaction(SIGCHLD, &sa, NULL);
+  Client *p1 = NULL, *p2 = NULL;
 
-		execvp(((char **)arg->v)[0], (char **)arg->v);
-		die("dwm: execvp '%s' failed:", ((char **)arg->v)[0]);
-	}
+  for (Client *c = selmon->clients; c; c = c->next) {
+    if (c->next == c1)
+      p1 = c;
+    if (c->next == c2)
+      p2 = c;
+  }
+
+  if (p1)
+    p1->next = c2;
+  else
+    selmon->clients = c2;
+
+  if (p2)
+    p2->next = c1;
+  else
+    selmon->clients = c1;
+
+  Client *tmp = c1->next;
+  c1->next = c2->next;
+  c2->next = tmp;
+
+  logselmonclients();
+  arrange(selmon);
+}
+
+void
+swapdown() {
+  if (!selmon->sel)
+    return;
+  swapclients(selmon->sel, getdownclient(selmon->sel));
+  logselmonclients();
+}
+
+void
+swapup() {
+  if (!selmon->sel)
+    return;
+  swapclients(selmon->sel, getupclient(selmon->sel));
+}
+
+void
+swapleft() {
+  if (!selmon->sel)
+    return;
+  swapclients(selmon->sel, getleftclient(selmon->sel));
+  logselmonclients();
+}
+
+void swapright() {
+  if (!selmon->sel)
+    return;
+  swapclients(selmon->sel, getrightclient(selmon->sel));
 }
 
 void
@@ -2402,7 +2487,7 @@ main(int argc, char *argv[])
 	checkotherwm();
 	setup();
   if (debug) {
-    printselmoninfo();
+    logselmoninfo();
   }
 #ifdef __OpenBSD__
 	if (pledge("stdio rpath proc exec", NULL) == -1)
