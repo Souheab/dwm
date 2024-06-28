@@ -2474,7 +2474,7 @@ int
 main(int argc, char *argv[])
 {
 	if (argc == 2 && !strcmp("-v", argv[1]))
-		die("dwm-"VERSION);
+		die("dwm-"VERSION": Souheab's fork");
   else if (argc == 2 && !strcmp("-d", argv[1])) {
     debug = true;
   }
