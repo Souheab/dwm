@@ -34,7 +34,7 @@ static const Rule rules[] = {
 
 /* layout(s) */
 static const float mfact     = 0.55; /* factor of master area size [0.05..0.95] */
-static const int nmaster     = 4;    /* number of clients in master area */
+static const int nmaster     = 1;    /* number of clients in master area */
 static const int resizehints = 1;    /* 1 means respect size hints in tiled resizals */
 static const int lockfullscreen = 1; /* 1 will force focus on the fullscreen window */
 
@@ -47,6 +47,7 @@ static const Layout layouts[] = {
 
 /* key definitions */
 #define MODKEY Mod4Mask
+#define ALTKEY Mod1Mask
 #define TERMINAL_PROGRAM "wezterm"
 #define TAGKEYS(KEY,TAG) \
 	{ MODKEY,                       KEY,      view,           {.ui = 1 << TAG} }, \
@@ -77,8 +78,8 @@ static const Key keys[] = {
 	{ MODKEY|ShiftMask,             XK_k,      swapup,         {0} },
 	{ MODKEY|ShiftMask,             XK_h,      swapleft,       {0} },
 	{ MODKEY|ShiftMask,             XK_l,      swapright,      {0} },
-	{ MODKEY,                       XK_i,      incnmaster,     {.i = +1 } },
-	{ MODKEY,                       XK_d,      incnmaster,     {.i = -1 } },
+	{ ALTKEY,                       XK_k,      incnmaster,     {.i = +1 } },
+	{ ALTKEY,                       XK_j,      incnmaster,     {.i = -1 } },
   //	{ MODKEY,                       XK_h,      setmfact,       {.f = -0.05} },
 	//{ MODKEY,                       XK_l,      setmfact,       {.f = +0.05} },
 	{ MODKEY|ShiftMask,             XK_Return, zoom,           {0} },
