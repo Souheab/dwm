@@ -163,6 +163,7 @@ static void configure(Client *c);
 static void configurenotify(XEvent *e);
 static void configurerequest(XEvent *e);
 static Monitor *createmon(void);
+static bool classmatch(Window win, const char *class);
 static void destroynotify(XEvent *e);
 static void detach(Client *c);
 static void detachstack(Client *c);
@@ -198,6 +199,7 @@ static void logselclientinfo(void);
 static void logselmoninfo(void);
 static void logselmonclients(void);
 static void manage(Window w, XWindowAttributes *wa);
+static void managealtbar(Window w, XWindowAttributes *wa);
 static void mappingnotify(XEvent *e);
 static void maprequest(XEvent *e);
 static void monocle(Monitor *m);
@@ -683,6 +685,29 @@ createmon(void)
 	m->lt[1] = &layouts[1 % LENGTH(layouts)];
 	strncpy(m->ltsymbol, layouts[0].symbol, sizeof m->ltsymbol);
 	return m;
+}
+
+bool
+classmatch(Window win, const char* class) {
+  XClassHint ch = {NULL , NULL};
+  bool res = true;
+
+  if (XGetClassHint(dpy, win, &ch)) {
+    if (ch.res_class && strstr(ch.res_class, class) == NULL) {
+      res = false;
+    }
+  } else {
+    res = false;
+  }
+
+  if (ch.res_class) {
+    XFree(ch.res_class);
+  } else {
+    res = false;
+  }
+
+  if (ch.res_name)
+    XFree(ch.res_name);
 }
 
 void
@@ -1304,6 +1329,13 @@ manage(Window w, XWindowAttributes *wa)
 	focus(NULL);
 }
 
+void
+managealtclient(Window win, XWindowAttributes *wa) {
+	XMoveResizeWindow(dpy, win, wa->x, wa->y, wa->width, wa->height);
+	XMapWindow(dpy, win);
+	XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend,
+		(unsigned char *) &win, 1);
+}
 void
 mappingnotify(XEvent *e)
 {
