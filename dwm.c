@@ -223,6 +223,7 @@ static void setfullscreen(Client *c, int fullscreen);
 static void setgaps(const Arg *arg);
 static void setlayout(const Arg *arg);
 static void setmfact(const Arg *arg);
+static void settopoffset(unsigned int offset);
 static void setup(void);
 static void seturgent(Client *c, int urg);
 static void showhide(Client *c);
@@ -1808,6 +1809,14 @@ setmfact(const Arg *arg)
 	arrange(selmon);
 }
 
+
+void
+settopoffset(unsigned int offset) {
+  selmon->wh -= topoffset;
+  selmon->wy += topoffset;
+  arrange(selmon);
+}
+
 void
 setup(void)
 {
@@ -2034,7 +2043,7 @@ void tile(Monitor *m) {
   for (i = 0, my = ty = m->gappx, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
     if (i < m->nmaster) {
       h = (m->wh - my) / (MIN(n, m->nmaster) - i) - m->gappx;
-      resize(c, m->wx + m->gappx, m->wy + my, mw - (2 * c->bw) - m->gappx, h - (2 * c->bw), 0);
+      resize(c, m->wx + m->gappx, m->wy + my , mw - (2 * c->bw) - m->gappx, h - (2 * c->bw), 0);
       if (my + HEIGHT(c) + m->gappx < m->wh)
         my += HEIGHT(c) + m->gappx;
     } else {
@@ -2052,6 +2061,7 @@ togglebar(const Arg *arg)
 	updatebarpos(selmon);
 	XMoveResizeWindow(dpy, selmon->barwin, selmon->wx, selmon->by, selmon->ww, bh);
 	arrange(selmon);
+  logselmoninfo();
 }
 
 void
@@ -2499,6 +2509,7 @@ main(int argc, char *argv[])
   if (debug) {
     logselmoninfo();
   }
+  settopoffset(topoffset);
 #ifdef __OpenBSD__
 	if (pledge("stdio rpath proc exec", NULL) == -1)
 		die("pledge");
