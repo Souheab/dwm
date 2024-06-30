@@ -216,7 +216,6 @@ static void manage(Window w, XWindowAttributes *wa);
 static void managealtbar(Window w, XWindowAttributes *wa);
 static void mappingnotify(XEvent *e);
 static void maprequest(XEvent *e);
-static void monocle(Monitor *m);
 static void motionnotify(XEvent *e);
 static void movemouse(const Arg *arg);
 static Client *nexttiled(Client *c);
@@ -1175,27 +1174,6 @@ Client
   return bestCandidate;
 }
 
-
-// Get's layout from selected tags
-// monocle is the most dominant layout, float is least dominant 
-const Layout
-*getlayoutfromtags(Tag **ts) {
-  const Layout *dominant = &layouts[FLOAT];
-
-  for (int i = 0; i < LENGTH(tags); i++) {
-    if (!istagselected(i))
-      continue;
-
-    if (ts[i]->lt[CURRENT_LAYOUT] == &layouts[MONOCLE])
-      return &layouts[MONOCLE];
-
-    if (ts[i]->lt[CURRENT_LAYOUT] == &layouts[TILE])
-      dominant = &layouts[TILE];
-  }
-
-  return dominant;
-}
-
 void
 grabbuttons(Client *c, int focused)
 {
@@ -1411,21 +1389,6 @@ maprequest(XEvent *e)
 		return;
 	if (!wintoclient(ev->window))
 		manage(ev->window, &wa);
-}
-
-void
-monocle(Monitor *m)
-{
-	unsigned int n = 0;
-	Client *c;
-
-	for (c = m->clients; c; c = c->next)
-		if (ISVISIBLE(c))
-			n++;
-	if (n > 0) /* override layout symbol */
-		snprintf(m->ltsymbol, sizeof m->ltsymbol, "[%d]", n);
-	for (c = nexttiled(m->clients); c; c = nexttiled(c->next))
-		resize(c, m->wx, m->wy, m->ww - 2 * c->bw, m->wh - 2 * c->bw, 0);
 }
 
 void

@@ -43,11 +43,9 @@ static const Layout layouts[] = {
 	/* symbol     arrange function */
 	{ "[]=",      tile },    /* first entry is default */
 	{ "><>",      NULL },    /* no layout function means floating behavior */
-	{ "[M]",      monocle },
 };
 #define TILE 0
 #define FLOAT 1
-#define MONOCLE 2
 
 /* key definitions */
 #define MODKEY Mod4Mask
