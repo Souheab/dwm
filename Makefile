@@ -8,13 +8,14 @@ OBJ = ${SRC:.c=.o}
 
 all: dwm
 
-.c.o:
-	${CC} -c ${CFLAGS} $<
-
 ${OBJ}: config.mk
 
 dwm: ${OBJ}
+	${CC} -c ${CFLAGS} $<
 	${CC} -o $@ ${OBJ} ${LDFLAGS}
+
+debug: CFLAGS += -DDEBUG -g
+debug: dwm
 
 clean:
 	rm -f dwm ${OBJ} dwm-${VERSION}.tar.gz

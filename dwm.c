@@ -120,10 +120,9 @@ typedef struct {
 #define CURRENT_LAYOUT 0
 #define PREVIOUS_LAYOUT 1
 typedef struct {
-  const Layout *lt[2];
+  const Layout *lt;
   float mfact;
   int nmaster;
-  int gappx;
 } Tag;
 
 struct Monitor {
@@ -160,6 +159,7 @@ typedef struct {
 /* function declarations */
 static void applyrules(Client *c);
 static int applysizehints(Client *c, int *x, int *y, int *w, int *h, int interact);
+static void applytag(Tag *t);
 static void arrange(Monitor *m);
 static void arrangemon(Monitor *m);
 static void attach(Client *c);
@@ -174,7 +174,7 @@ static void configure(Client *c);
 static void configurenotify(XEvent *e);
 static void configurerequest(XEvent *e);
 static Monitor *createmon(void);
-static Tag **createtags(float mfact, int nmaster, int gappx);
+static Tag **createtags(const Layout *lt, float mfact, int nmaster);
 static bool classmatch(Window win, const char *class);
 static void destroynotify(XEvent *e);
 static void detach(Client *c);
@@ -200,7 +200,8 @@ static Client *getupclient(Client *c);
 static Client *getdownclient(Client *c);
 static Client *getleftclient(Client *c);
 static Client *getrightclient(Client *c);
-static const Layout *getlayoutfromtags(Tag **ts);
+static Tag *getdomtag(Tag **ts);
+static int gettagindex(Monitor *m, Tag *t);
 static void grabbuttons(Client *c, int focused);
 static void grabkeys(void);
 static void incnmaster(const Arg *arg);
@@ -421,6 +422,13 @@ applysizehints(Client *c, int *x, int *y, int *w, int *h, int interact)
 			*h = MIN(*h, c->maxh);
 	}
 	return *x != c->x || *y != c->y || *w != c->w || *h != c->h;
+}
+
+void
+applytag(Tag *t) {
+  selmon->nmaster = t->nmaster;
+  selmon->mfact = t->mfact;
+  selmon->lt = t->lt;
 }
 
 void
@@ -696,14 +704,21 @@ createmon(void)
 	m->topbar = topbar;
 	m->gappx = gappx;
 	m->lt = &layouts[0];
-  m->tags = createtags(m->mfact, m->nmaster, m->gappx); 
+  m->tags = createtags(m->lt, m->mfact, m->nmaster); 
 	strncpy(m->ltsymbol, layouts[0].symbol, sizeof m->ltsymbol);
 	return m;
 }
 
 Tag **
-createtags(float mfact, int nmaster, int gappx) {
-  Tag **ts = ecalloc(LENGTH(tags), sizeof(tags));
+createtags(const Layout *lt, float mfact, int nmaster) {
+  Tag **ts = ecalloc(LENGTH(tags), sizeof(Tag*));
+
+  for (int i = 0; i < LENGTH(tags); i++) {
+    ts[i] = ecalloc(1, sizeof(Tag));
+    ts[i]->lt = lt;
+    ts[i]->mfact = mfact;
+    ts[i]->nmaster = nmaster;
+  }
 
   return ts;
 }
@@ -1174,6 +1189,38 @@ Client
   return bestCandidate;
 }
 
+// Gets most dominant tag
+// Lower number = dominant here
+Tag
+*getdomtag(Tag **ts) {
+  if (selmon->tagset[selmon->seltags] == 0)
+    return NULL;
+    
+  Tag *t = NULL;
+
+  for (int i = 0; i < LENGTH(tags); i++) {
+    if (!istagselected(i))
+      continue;
+    else
+      t = ts[i];
+  }
+
+  return t;
+}
+
+int
+gettagindex(Monitor *m, Tag *t) {
+  if (!t)
+    return -1;
+
+  for (int i = 0; i < LENGTH(tags); i++) {
+    if (m->tags[i] == t)
+      return i;
+  }
+
+  return -1;
+}
+
 void
 grabbuttons(Client *c, int focused)
 {
@@ -1226,7 +1273,14 @@ grabkeys(void)
 void
 incnmaster(const Arg *arg)
 {
-	selmon->nmaster = MAX(selmon->nmaster + arg->i, 0);
+  Tag* t = getdomtag(selmon->tags);
+  logdebugf("Dom Tag Index: %d", gettagindex(selmon, t));
+
+  if (!t)
+    return;
+
+  t->nmaster = MAX(selmon->nmaster + arg->i, 0);
+	selmon->nmaster = t->nmaster;
 	arrange(selmon);
 }
 
@@ -2463,16 +2517,17 @@ updatewmhints(Client *c)
 	}
 }
 
-void
-view(const Arg *arg)
-{
-	if ((arg->ui & TAGMASK) == selmon->tagset[selmon->seltags])
-		return;
-	selmon->seltags ^= 1; /* toggle sel tagset */
-	if (arg->ui & TAGMASK)
-		selmon->tagset[selmon->seltags] = arg->ui & TAGMASK;
-	focus(NULL);
-	arrange(selmon);
+void view(const Arg *arg) {
+  if ((arg->ui & TAGMASK) == selmon->tagset[selmon->seltags])
+    return;
+  selmon->seltags ^= 1; /* toggle sel tagset */
+  if (arg->ui & TAGMASK) {
+    selmon->tagset[selmon->seltags] = arg->ui & TAGMASK;
+    applytag(selmon->tags[arg->ui]);
+  }
+
+  focus(NULL);
+  arrange(selmon);
 }
 
 Client *
