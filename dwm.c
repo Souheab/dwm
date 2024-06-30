@@ -20,6 +20,7 @@
  *
  * To understand everything else, start reading main().
  */
+#include <X11/X.h>
 #include <errno.h>
 #include <locale.h>
 #include <signal.h>
@@ -101,6 +102,7 @@ struct Client {
 	Client *snext;
 	Monitor *mon;
 	Window win;
+  bool maximized;
 };
 
 typedef struct {
@@ -255,6 +257,7 @@ static void togglefloating(const Arg *arg);
 static void togglefullscr(const Arg *arg);
 static void toggletag(const Arg *arg);
 static void toggleview(const Arg *arg);
+static void togglemaximize();
 static void unfocus(Client *c, int setfocus);
 static void unmanage(Client *c, int destroyed);
 static void unmapnotify(XEvent *e);
@@ -1335,6 +1338,7 @@ manage(Window w, XWindowAttributes *wa)
 	c->w = c->oldw = wa->width;
 	c->h = c->oldh = wa->height;
 	c->oldbw = wa->border_width;
+  c->maximized = false;
 
 	updatetitle(c);
 	if (XGetTransientForHint(dpy, w, &trans) && (t = wintoclient(trans))) {
@@ -2118,17 +2122,25 @@ void tile(Monitor *m) {
   if (n == 0)
     return;
 
+
   if (n > m->nmaster)
     mw = m->nmaster ? m->ww * m->mfact : 0;
   else
     mw = m->ww - m->gappx;
   for (i = 0, my = ty = m->gappx, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
-    if (i < m->nmaster) {
+    if (c->maximized) {
+      resize(c, m->wx, m->wy, m->ww - 2 * c->bw, m->wh - 2 * c->bw, 0);
+      continue;
+    }
+
+    else if (i < m->nmaster) {
       h = (m->wh - my) / (MIN(n, m->nmaster) - i) - m->gappx;
       resize(c, m->wx + m->gappx, m->wy + my , mw - (2 * c->bw) - m->gappx, h - (2 * c->bw), 0);
       if (my + HEIGHT(c) + m->gappx < m->wh)
         my += HEIGHT(c) + m->gappx;
-    } else {
+    }
+
+    else {
       h = (m->wh - ty) / (n - i) - m->gappx;
       resize(c, m->wx + mw + m->gappx, m->wy + ty, m->ww - mw - (2 * c->bw) - 2 * m->gappx, h - (2 * c->bw), 0);
       if (ty + HEIGHT(c) + m->gappx < m->wh)
@@ -2192,6 +2204,12 @@ toggleview(const Arg *arg)
 		focus(NULL);
 		arrange(selmon);
 	}
+}
+
+void
+togglemaximize() {
+  selmon->sel->maximized = !(selmon->sel->maximized);
+  arrange(selmon);
 }
 
 void
