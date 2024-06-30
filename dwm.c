@@ -198,9 +198,11 @@ static Client *getupclient(Client *c);
 static Client *getdownclient(Client *c);
 static Client *getleftclient(Client *c);
 static Client *getrightclient(Client *c);
+static const Layout *getlayoutfromtags(Tag **ts);
 static void grabbuttons(Client *c, int focused);
 static void grabkeys(void);
 static void incnmaster(const Arg *arg);
+static bool istagselected(int tagnum);
 static void keypress(XEvent *e);
 static void killclient(const Arg *arg);
 static void logdebug(char* str);
@@ -1170,6 +1172,27 @@ Client
   return bestCandidate;
 }
 
+
+// Get's layout from selected tags
+// monocle is the most dominant layout, float is least dominant 
+const Layout
+*getlayoutfromtags(Tag **ts) {
+  const Layout *dominant = &layouts[FLOAT];
+
+  for (int i = 0; i < LENGTH(tags); i++) {
+    if (!istagselected(i))
+      continue;
+
+    if (ts[i]->lt[CURRENT_LAYOUT] == &layouts[MONOCLE])
+      return &layouts[MONOCLE];
+
+    if (ts[i]->lt[CURRENT_LAYOUT] == &layouts[TILE])
+      dominant = &layouts[TILE];
+  }
+
+  return dominant;
+}
+
 void
 grabbuttons(Client *c, int focused)
 {
@@ -1224,6 +1247,15 @@ incnmaster(const Arg *arg)
 {
 	selmon->nmaster = MAX(selmon->nmaster + arg->i, 0);
 	arrange(selmon);
+}
+
+
+bool
+istagselected(int tagnum) {
+  if (tagnum >= LENGTH(tags))
+    return false;
+
+  return ((selmon->tagset[selmon->seltags]) & (1 << tagnum)) != 0;
 }
 
 #ifdef XINERAMA
@@ -1834,8 +1866,9 @@ setgaps(const Arg *arg)
 void
 setlayout(const Arg *arg)
 {
-	if (arg && arg->v)
+	if (arg && arg->v) {
 		selmon->lt = (Layout *)arg->v;
+  }
 	strncpy(selmon->ltsymbol, selmon->lt->symbol, sizeof selmon->ltsymbol);
 	if (selmon->sel)
 		arrange(selmon);
