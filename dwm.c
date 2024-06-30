@@ -115,6 +115,15 @@ typedef struct {
 	void (*arrange)(Monitor *);
 } Layout;
 
+#define CURRENT_LAYOUT 0
+#define PREVIOUS_LAYOUT 1
+typedef struct {
+  const Layout *lt[2];
+  float mfact;
+  int nmaster;
+  int gappx;
+} Tag;
+
 struct Monitor {
 	char ltsymbol[16];
 	float mfact;
@@ -134,6 +143,7 @@ struct Monitor {
 	Monitor *next;
 	Window barwin;
 	const Layout *lt;
+  Tag **tags;
 };
 
 typedef struct {
@@ -162,6 +172,7 @@ static void configure(Client *c);
 static void configurenotify(XEvent *e);
 static void configurerequest(XEvent *e);
 static Monitor *createmon(void);
+static Tag **createtags(float mfact, int nmaster, int gappx);
 static bool classmatch(Window win, const char *class);
 static void destroynotify(XEvent *e);
 static void detach(Client *c);
@@ -681,8 +692,16 @@ createmon(void)
 	m->topbar = topbar;
 	m->gappx = gappx;
 	m->lt = &layouts[0];
+  m->tags = createtags(m->mfact, m->nmaster, m->gappx); 
 	strncpy(m->ltsymbol, layouts[0].symbol, sizeof m->ltsymbol);
 	return m;
+}
+
+Tag **
+createtags(float mfact, int nmaster, int gappx) {
+  Tag **ts = ecalloc(LENGTH(tags), sizeof(tags));
+
+  return ts;
 }
 
 bool
