@@ -59,6 +59,8 @@
 #define TAGMASK                 ((1 << LENGTH(tags)) - 1)
 #define TEXTW(X)                (drw_fontset_getwidth(drw, (X)) + lrpad)
 
+#include "tags.h"
+
 /* enums */
 enum { CurNormal, CurResize, CurMove, CurLast }; /* cursor */
 enum { SchemeNorm, SchemeSel }; /* color schemes */
@@ -144,7 +146,7 @@ struct Monitor {
 	Monitor *next;
 	Window barwin;
 	const Layout *lt;
-  Tag **tags;
+  Tag tags[LENGTH(tags)];
 };
 
 typedef struct {
@@ -174,7 +176,6 @@ static void configure(Client *c);
 static void configurenotify(XEvent *e);
 static void configurerequest(XEvent *e);
 static Monitor *createmon(void);
-static Tag **createtags(const Layout *lt, float mfact, int nmaster);
 static bool classmatch(Window win, const char *class);
 static void destroynotify(XEvent *e);
 static void detach(Client *c);
@@ -200,7 +201,7 @@ static Client *getupclient(Client *c);
 static Client *getdownclient(Client *c);
 static Client *getleftclient(Client *c);
 static Client *getrightclient(Client *c);
-static Tag *getdomtag(Tag **ts);
+static Tag *getdomtag(Tag ts[LENGTH(tags)]);
 static int gettagindex(Monitor *m, Tag *t);
 static void grabbuttons(Client *c, int focused);
 static void grabkeys(void);
@@ -704,23 +705,11 @@ createmon(void)
 	m->topbar = topbar;
 	m->gappx = gappx;
 	m->lt = &layouts[0];
-  m->tags = createtags(m->lt, m->mfact, m->nmaster); 
+  for (int i = 0; i < LENGTH(tags); i++) {
+    m->tags[i] = (Tag) {m->lt, m->mfact, m->nmaster};
+  }
 	strncpy(m->ltsymbol, layouts[0].symbol, sizeof m->ltsymbol);
 	return m;
-}
-
-Tag **
-createtags(const Layout *lt, float mfact, int nmaster) {
-  Tag **ts = ecalloc(LENGTH(tags), sizeof(Tag*));
-
-  for (int i = 0; i < LENGTH(tags); i++) {
-    ts[i] = ecalloc(1, sizeof(Tag));
-    ts[i]->lt = lt;
-    ts[i]->mfact = mfact;
-    ts[i]->nmaster = nmaster;
-  }
-
-  return ts;
 }
 
 bool
@@ -1192,7 +1181,7 @@ Client
 // Gets most dominant tag
 // Lower number = dominant here
 Tag
-*getdomtag(Tag **ts) {
+*getdomtag(Tag ts[LENGTH(tags)]) {
   if (selmon->tagset[selmon->seltags] == 0)
     return NULL;
     
@@ -1202,7 +1191,7 @@ Tag
     if (!istagselected(i))
       continue;
     else
-      t = ts[i];
+      t = &ts[i];
   }
 
   return t;
@@ -1214,7 +1203,7 @@ gettagindex(Monitor *m, Tag *t) {
     return -1;
 
   for (int i = 0; i < LENGTH(tags); i++) {
-    if (m->tags[i] == t)
+    if (&(m->tags[i]) == t)
       return i;
   }
 
@@ -2523,7 +2512,7 @@ void view(const Arg *arg) {
   selmon->seltags ^= 1; /* toggle sel tagset */
   if (arg->ui & TAGMASK) {
     selmon->tagset[selmon->seltags] = arg->ui & TAGMASK;
-    applytag(selmon->tags[arg->ui]);
+    applytag(getdomtag(selmon->tags));
   }
 
   focus(NULL);
