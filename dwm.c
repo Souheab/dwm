@@ -1887,20 +1887,19 @@ setlayout(const Arg *arg)
 }
 
 /* arg > 1.0 will set mfact absolutely */
-void
-setmfact(const Arg *arg)
-{
-	float f;
+void setmfact(const Arg *arg) {
+  float f;
 
-	if (!arg || !selmon->lt->arrange)
-		return;
-	f = arg->f < 1.0 ? arg->f + selmon->mfact : arg->f - 1.0;
-	if (f < 0.05 || f > 0.95)
-		return;
-	selmon->mfact = f;
-	arrange(selmon);
+  if (!arg || !selmon->lt->arrange)
+    return;
+  f = arg->f < 1.0 ? arg->f + selmon->mfact : arg->f - 1.0;
+  if (f < 0.05 || f > 0.95)
+    return;
+  Tag *t = getdomtag(selmon->tags);
+  t->mfact = f;
+  selmon->mfact = t->mfact;
+  arrange(selmon);
 }
-
 
 void
 settopoffset(unsigned int offset) {
@@ -2195,6 +2194,7 @@ toggletag(const Arg *arg)
 	newtags = selmon->sel->tags ^ (arg->ui & TAGMASK);
 	if (newtags) {
 		selmon->sel->tags = newtags;
+    applytag(getdomtag(selmon->tags));
 		focus(NULL);
 		arrange(selmon);
 	}
@@ -2207,6 +2207,7 @@ toggleview(const Arg *arg)
 
 	if (newtagset) {
 		selmon->tagset[selmon->seltags] = newtagset;
+    applytag(getdomtag(selmon->tags));
 		focus(NULL);
 		arrange(selmon);
 	}
