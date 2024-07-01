@@ -119,12 +119,11 @@ typedef struct {
 	void (*arrange)(Monitor *);
 } Layout;
 
-#define CURRENT_LAYOUT 0
-#define PREVIOUS_LAYOUT 1
 typedef struct {
   const Layout *lt;
   float mfact;
   int nmaster;
+  bool isrighttiled;
 } Tag;
 
 struct Monitor {
@@ -147,6 +146,7 @@ struct Monitor {
 	Window barwin;
 	const Layout *lt;
   Tag tags[LENGTH(tags)];
+  bool isrighttiled;
 };
 
 typedef struct {
@@ -258,6 +258,7 @@ static void togglefullscr(const Arg *arg);
 static void toggletag(const Arg *arg);
 static void toggleview(const Arg *arg);
 static void togglemaximize();
+static void toggletiledir();
 static void unfocus(Client *c, int setfocus);
 static void unmanage(Client *c, int destroyed);
 static void unmapnotify(XEvent *e);
@@ -429,6 +430,7 @@ applytag(Tag *t) {
   selmon->nmaster = t->nmaster;
   selmon->mfact = t->mfact;
   selmon->lt = t->lt;
+  selmon->isrighttiled = t->isrighttiled;
 }
 
 void
@@ -705,8 +707,9 @@ createmon(void)
 	m->gappx = gappx;
 	m->lt = &layouts[0];
   for (int i = 0; i < LENGTH(tags); i++) {
-    m->tags[i] = (Tag) {m->lt, m->mfact, m->nmaster};
+    m->tags[i] = (Tag) {m->lt, m->mfact, m->nmaster, false};
   }
+  m->isrighttiled = false;
 	strncpy(m->ltsymbol, layouts[0].symbol, sizeof m->ltsymbol);
 	return m;
 }
@@ -2118,7 +2121,7 @@ tagmon(const Arg *arg)
 }
 
 void tile(Monitor *m) {
-  unsigned int i, n, h, mw, my, ty;
+  unsigned int i, n, h, mw, my, ty, mx, tx;
   Client *c;
 
   for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++)
@@ -2131,6 +2134,17 @@ void tile(Monitor *m) {
     mw = m->nmaster ? m->ww * m->mfact : 0;
   else
     mw = m->ww - m->gappx;
+
+  if (selmon->isrighttiled) {
+    mx = m->wx + (m->ww - mw);
+    tx = m->wx + m->gappx;
+  }
+
+  else {
+    mx  = m->wx + m->gappx;
+    tx = m->wx + mw + m->gappx;
+  }
+
   for (i = 0, my = ty = m->gappx, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
     if (c->maximized) {
       resize(c, m->wx, m->wy, m->ww - 2 * c->bw, m->wh - 2 * c->bw, 0);
@@ -2139,14 +2153,14 @@ void tile(Monitor *m) {
 
     else if (i < m->nmaster) {
       h = (m->wh - my) / (MIN(n, m->nmaster) - i) - m->gappx;
-      resize(c, m->wx + m->gappx, m->wy + my , mw - (2 * c->bw) - m->gappx, h - (2 * c->bw), 0);
+      resize(c, mx, m->wy + my , mw - (2 * c->bw) - m->gappx, h - (2 * c->bw), 0);
       if (my + HEIGHT(c) + m->gappx < m->wh)
         my += HEIGHT(c) + m->gappx;
     }
 
     else {
       h = (m->wh - ty) / (n - i) - m->gappx;
-      resize(c, m->wx + mw + m->gappx, m->wy + ty, m->ww - mw - (2 * c->bw) - 2 * m->gappx, h - (2 * c->bw), 0);
+      resize(c, tx, m->wy + ty, m->ww - mw - (2 * c->bw) - 2 * m->gappx, h - (2 * c->bw), 0);
       if (ty + HEIGHT(c) + m->gappx < m->wh)
         ty += HEIGHT(c) + m->gappx;
     }
@@ -2215,6 +2229,14 @@ toggleview(const Arg *arg)
 void
 togglemaximize() {
   selmon->sel->maximized = !(selmon->sel->maximized);
+  arrange(selmon);
+}
+
+void
+toggletiledir() {
+  Tag *t = getdomtag(selmon->tags);
+  t->isrighttiled = !t->isrighttiled;
+  applytag(t);
   arrange(selmon);
 }
 
