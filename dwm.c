@@ -1603,7 +1603,7 @@ logselmonclients() {
     for (c = selmon->clients; c; c = c->next) {
       printf("{");
       printf("Name: %s, ", c->name);
-      printf("address: %p", c);
+      printf("address: %p", (void *) c);
       printf("}, ");
     }
     printf("\n");
