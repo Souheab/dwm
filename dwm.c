@@ -1894,7 +1894,13 @@ void setmfact(const Arg *arg) {
 
   if (!arg || !selmon->lt->arrange)
     return;
-  f = arg->f < 1.0 ? arg->f + selmon->mfact : arg->f - 1.0;
+
+  f = arg->f;
+
+  if (selmon->isrighttiled)
+    f = -f;
+
+  f = f < 1.0 ? f + selmon->mfact : f - 1.0;
   if (f < 0.05 || f > 0.95)
     return;
   Tag *t = getdomtag(selmon->tags);
