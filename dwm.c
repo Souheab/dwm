@@ -215,7 +215,6 @@ static void logselclientinfo(void);
 static void logselmoninfo(void);
 static void logselmonclients(void);
 static void manage(Window w, XWindowAttributes *wa);
-static void managealtbar(Window w, XWindowAttributes *wa);
 static void mappingnotify(XEvent *e);
 static void maprequest(XEvent *e);
 static void motionnotify(XEvent *e);
