@@ -70,7 +70,7 @@ enum { WMProtocols, WMDelete, WMState, WMTakeFocus, WMLast }; /* default atoms *
 enum { ClkTagBar, ClkLtSymbol, ClkStatusText, ClkWinTitle,
        ClkClientWin, ClkRootWin, ClkLast }; /* clicks */
 // DWM internal atoms
-enum {DWMTagMask, DWMLast};
+enum {DWMTagMask, DWMSetTagMask, DWMLast};
 
 /* dwm settings */
 static bool debug = false;
@@ -1545,7 +1545,17 @@ propertynotify(XEvent *e)
 		}
 		if (ev->atom == netatom[NetWMWindowType])
 			updatewindowtype(c);
-	}
+	} else if (ev->window == root && ev->atom == dwmatom[DWMSetTagMask]) {
+    unsigned int new_mask;
+    if (gettextprop(root, dwmatom[DWMSetTagMask], stext, sizeof(stext))) {
+      new_mask = (unsigned int)atoi(stext);
+      if (new_mask & TAGMASK) {
+        selmon->tagset[selmon->seltags] = new_mask & TAGMASK;
+        focus(NULL);
+        arrange(selmon);
+      }
+    }
+  }
 }
 
 void
@@ -1937,6 +1947,7 @@ setup(void)
 	netatom[NetClientList] = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
 
   dwmatom[DWMTagMask] = XInternAtom(dpy, "DWM_TAG_MASK", False);
+  dwmatom[DWMSetTagMask] = XInternAtom(dpy, "DWM_SET_TAG_MASK", False);
 	/* init cursors */
 	cursor[CurNormal] = drw_cur_create(drw, XC_left_ptr);
 	cursor[CurResize] = drw_cur_create(drw, XC_sizing);
@@ -1961,6 +1972,8 @@ setup(void)
 		PropModeReplace, (unsigned char *) netatom, NetLast);
 	XDeleteProperty(dpy, root, netatom[NetClientList]);
   updatedwmtagmaskxprop();
+  XChangeProperty(dpy, root, dwmatom[DWMSetTagMask], utf8string, 8,
+                  PropModeReplace,(unsigned char *) "1" , 1);
 	/* select events */
 	wa.cursor = cursor[CurNormal]->cursor;
 	wa.event_mask = SubstructureRedirectMask|SubstructureNotifyMask
