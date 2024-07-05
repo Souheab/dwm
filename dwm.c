@@ -21,7 +21,6 @@
  * To understand everything else, start reading main().
  */
 #include <X11/X.h>
-#include <errno.h>
 #include <locale.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -70,6 +69,8 @@ enum { NetSupported, NetWMName, NetWMState, NetWMCheck,
 enum { WMProtocols, WMDelete, WMState, WMTakeFocus, WMLast }; /* default atoms */
 enum { ClkTagBar, ClkLtSymbol, ClkStatusText, ClkWinTitle,
        ClkClientWin, ClkRootWin, ClkLast }; /* clicks */
+// DWM internal atoms
+enum {DWMTagMask, DWMLast};
 
 /* dwm settings */
 static bool debug = false;
@@ -176,7 +177,6 @@ static void configure(Client *c);
 static void configurenotify(XEvent *e);
 static void configurerequest(XEvent *e);
 static Monitor *createmon(void);
-static bool classmatch(Window win, const char *class);
 static void destroynotify(XEvent *e);
 static void detach(Client *c);
 static void detachstack(Client *c);
@@ -189,10 +189,10 @@ static void focus(Client *c);
 static void focusin(XEvent *e);
 static void focusmon(const Arg *arg);
 static void focusstack(const Arg *arg);
-static void focusup();
-static void focusdown();
-static void focusleft();
-static void focusright();
+static void focusup(const Arg *arg);
+static void focusdown(const Arg *arg);
+static void focusleft(const Arg *arg);
+static void focusright(const Arg *arg);
 static Atom getatomprop(Client *c, Atom prop);
 static int getrootptr(int *x, int *y);
 static long getstate(Window w);
@@ -245,10 +245,10 @@ static void seturgent(Client *c, int urg);
 static void showhide(Client *c);
 static void spawn(const Arg *arg);
 static void swapclients(Client *c1, Client *c2);
-static void swapup();
-static void swapdown();
-static void swapleft();
-static void swapright();
+static void swapup(const Arg *arg);
+static void swapdown(const Arg *arg);
+static void swapleft(const Arg *arg);
+static void swapright(const Arg *arg);
 static void tag(const Arg *arg);
 static void tagmon(const Arg *arg);
 static void tile(Monitor *m);
@@ -257,8 +257,8 @@ static void togglefloating(const Arg *arg);
 static void togglefullscr(const Arg *arg);
 static void toggletag(const Arg *arg);
 static void toggleview(const Arg *arg);
-static void togglemaximize();
-static void toggletiledir();
+static void togglemaximize(const Arg *arg);
+static void toggletiledir(const Arg *arg);
 static void unfocus(Client *c, int setfocus);
 static void unmanage(Client *c, int destroyed);
 static void unmapnotify(XEvent *e);
@@ -272,6 +272,7 @@ static void updatestatus(void);
 static void updatetitle(Client *c);
 static void updatewindowtype(Client *c);
 static void updatewmhints(Client *c);
+static void updatedwmtagmaskxprop(void);
 static void view(const Arg *arg);
 static Client *wintoclient(Window w);
 static Monitor *wintomon(Window w);
@@ -305,7 +306,8 @@ static void (*handler[LASTEvent]) (XEvent *) = {
 	[PropertyNotify] = propertynotify,
 	[UnmapNotify] = unmapnotify
 };
-static Atom wmatom[WMLast], netatom[NetLast];
+static Atom wmatom[WMLast], netatom[NetLast], dwmatom[DWMLast];
+static Atom utf8string;
 static int running = 1;
 static Cur *cursor[CurLast];
 static Clr **scheme;
@@ -714,31 +716,6 @@ createmon(void)
 	return m;
 }
 
-bool
-classmatch(Window win, const char* class) {
-  XClassHint ch = {NULL , NULL};
-  bool res = true;
-
-  if (XGetClassHint(dpy, win, &ch)) {
-    if (ch.res_class && strstr(ch.res_class, class) == NULL) {
-      res = false;
-    }
-  } else {
-    res = false;
-  }
-
-  if (ch.res_class) {
-    XFree(ch.res_class);
-  } else {
-    res = false;
-  }
-
-  if (ch.res_name)
-    XFree(ch.res_name);
-
-  return res;
-}
-
 void
 destroynotify(XEvent *e)
 {
@@ -955,7 +932,7 @@ focusstack(const Arg *arg)
 }
 
 void
-focusup()
+focusup(const Arg *arg)
 {
   Client *c = selmon->sel;
   if (c != NULL) {
@@ -967,7 +944,7 @@ focusup()
 } 
 
 void
-focusdown()
+focusdown(const Arg *arg)
 {
   Client *c = selmon->sel;
   if (c != NULL) {
@@ -979,7 +956,7 @@ focusdown()
 }
 
 void
-focusleft()
+focusleft(const Arg *arg)
 {
   Client *c = selmon->sel;
   if (c != NULL) {
@@ -991,7 +968,7 @@ focusleft()
 } 
 
 void
-focusright()
+focusright(const Arg *arg)
 {
   Client *c = selmon->sel;
   if (c != NULL) {
@@ -1572,7 +1549,7 @@ propertynotify(XEvent *e)
 }
 
 void
-logselclientinfo() {
+logselclientinfo(void) {
   Client *c = selmon->sel;
   if (c == NULL) {
     logdebug("No selected client\n");
@@ -1588,7 +1565,7 @@ logselclientinfo() {
 }
 
 void
-logselmoninfo() {
+logselmoninfo(void) {
   if (debug) {
     logdebug("Selected monitor info:\n");
     printf("  wx: %d\n", selmon->wx);
@@ -1599,7 +1576,7 @@ logselmoninfo() {
 }
 
 void
-logselmonclients() {
+logselmonclients(void) {
   if (debug) {
     logdebug("Selected monitor clients: [");
     Client *c;
@@ -1921,7 +1898,6 @@ setup(void)
 {
 	int i;
 	XSetWindowAttributes wa;
-	Atom utf8string;
 	struct sigaction sa;
 
 	/* do not transform children into zombies when they terminate */
@@ -1959,6 +1935,8 @@ setup(void)
 	netatom[NetWMWindowType] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False);
 	netatom[NetWMWindowTypeDialog] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DIALOG", False);
 	netatom[NetClientList] = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
+
+  dwmatom[DWMTagMask] = XInternAtom(dpy, "DWM_TAG_MASK", False);
 	/* init cursors */
 	cursor[CurNormal] = drw_cur_create(drw, XC_left_ptr);
 	cursor[CurResize] = drw_cur_create(drw, XC_sizing);
@@ -1982,6 +1960,7 @@ setup(void)
 	XChangeProperty(dpy, root, netatom[NetSupported], XA_ATOM, 32,
 		PropModeReplace, (unsigned char *) netatom, NetLast);
 	XDeleteProperty(dpy, root, netatom[NetClientList]);
+  updatedwmtagmaskxprop();
 	/* select events */
 	wa.cursor = cursor[CurNormal]->cursor;
 	wa.event_mask = SubstructureRedirectMask|SubstructureNotifyMask
@@ -2080,7 +2059,7 @@ swapclients(Client *c1, Client *c2) {
 }
 
 void
-swapdown() {
+swapdown(const Arg *arg) {
   if (!selmon->sel)
     return;
   swapclients(selmon->sel, getdownclient(selmon->sel));
@@ -2088,21 +2067,21 @@ swapdown() {
 }
 
 void
-swapup() {
+swapup(const Arg *arg) {
   if (!selmon->sel)
     return;
   swapclients(selmon->sel, getupclient(selmon->sel));
 }
 
 void
-swapleft() {
+swapleft(const Arg *arg) {
   if (!selmon->sel)
     return;
   swapclients(selmon->sel, getleftclient(selmon->sel));
   logselmonclients();
 }
 
-void swapright() {
+void swapright(const Arg *arg) {
   if (!selmon->sel)
     return;
   swapclients(selmon->sel, getrightclient(selmon->sel));
@@ -2214,6 +2193,7 @@ toggletag(const Arg *arg)
 	if (newtags) {
 		selmon->sel->tags = newtags;
     applytag(getdomtag(selmon->tags));
+    updatedwmtagmaskxprop();
 		focus(NULL);
 		arrange(selmon);
 	}
@@ -2227,19 +2207,20 @@ toggleview(const Arg *arg)
 	if (newtagset) {
 		selmon->tagset[selmon->seltags] = newtagset;
     applytag(getdomtag(selmon->tags));
+    updatedwmtagmaskxprop();
 		focus(NULL);
 		arrange(selmon);
 	}
 }
 
 void
-togglemaximize() {
+togglemaximize(const Arg *arg) {
   selmon->sel->maximized = !(selmon->sel->maximized);
   arrange(selmon);
 }
 
 void
-toggletiledir() {
+toggletiledir(const Arg *arg) {
   Tag *t = getdomtag(selmon->tags);
   t->isrighttiled = !t->isrighttiled;
   applytag(t);
@@ -2534,6 +2515,16 @@ updatewmhints(Client *c)
 	}
 }
 
+void
+updatedwmtagmaskxprop(void) {
+  // TODO: remove magic num
+  char dwm_tag_mask_str[11];
+  int strlength;
+  strlength = snprintf(dwm_tag_mask_str, sizeof(dwm_tag_mask_str), "%u", selmon->tagset[selmon->seltags]);
+  XChangeProperty(dpy, root, dwmatom[DWMTagMask], utf8string, 8,
+                  PropModeReplace,(unsigned char *) dwm_tag_mask_str , strlength);
+}
+
 void view(const Arg *arg) {
   if ((arg->ui & TAGMASK) == selmon->tagset[selmon->seltags])
     return;
@@ -2541,6 +2532,7 @@ void view(const Arg *arg) {
   if (arg->ui & TAGMASK) {
     selmon->tagset[selmon->seltags] = arg->ui & TAGMASK;
     applytag(getdomtag(selmon->tags));
+    updatedwmtagmaskxprop();
   }
 
   focus(NULL);
@@ -2628,19 +2620,19 @@ zoom(const Arg *arg)
 int
 main(int argc, char *argv[])
 {
-	if (argc == 2 && !strcmp("-v", argv[1]))
-		die("dwm-"VERSION": Souheab's fork");
+  if (argc == 2 && !strcmp("-v", argv[1]))
+    die("dwm-" VERSION ": Souheab's fork");
   else if (argc == 2 && !strcmp("-d", argv[1])) {
     debug = true;
-  }
-	else if (argc != 1)
-		die("usage: dwm [-v | -d]");
-	if (!setlocale(LC_CTYPE, "") || !XSupportsLocale())
-		fputs("warning: no locale support\n", stderr);
-	if (!(dpy = XOpenDisplay(NULL)))
-		die("dwm: cannot open display");
-	checkotherwm();
-	setup();
+  } else if (argc != 1)
+    die("usage: dwm [-v | -d]");
+
+  if (!setlocale(LC_CTYPE, "") || !XSupportsLocale())
+    fputs("warning: no locale support\n", stderr);
+  if (!(dpy = XOpenDisplay(NULL)))
+    die("dwm: cannot open display");
+  checkotherwm();
+  setup();
   if (debug) {
     logselmoninfo();
   }
