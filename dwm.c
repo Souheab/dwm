@@ -1056,7 +1056,7 @@ Client
   if (onlyclient(c))
     return c;
 
-  for (iter = selmon->clients; iter; iter = iter->next) {
+  for (iter = nexttiled(selmon->clients); iter; iter = nexttiled(iter->next)) {
     if (iter == c)
       continue;
     if (!ISVISIBLE(iter))
@@ -1083,7 +1083,7 @@ Client
   if (onlyclient(c))
     return c;
 
-  for (iter = selmon->clients; iter; iter = iter->next) {
+  for (iter = nexttiled(selmon->clients); iter; iter = nexttiled(iter->next)) {
     if (iter == c)
       continue;
     if (!ISVISIBLE(iter))
@@ -1108,19 +1108,22 @@ Client *getleftclient(Client *c) {
   if (onlyclient(c))
     return c;
 
-  for (iter = selmon->clients; iter; iter = iter->next) {
+  for (iter = nexttiled(selmon->clients); iter; iter = nexttiled(iter->next)) {
+    logdebugf("client: %d\n", iter->x);
     if (iter->x >= c->x)
       continue;
     if (!ISVISIBLE(c))
       continue;
 
     yDev = abs(c->y - iter->y);
+    logdebugf("%d\n", yDev);
     if (yDev < bestYDev) {
       bestYDev = yDev;
       bestCandidate = iter;
     }
   }
 
+  logdebug("ran log debug");
   return bestCandidate;
 }
 
@@ -1137,7 +1140,7 @@ Client
     return c;
   }
 
-  for (iter = selmon->clients; iter; iter = iter->next) {
+  for (iter = nexttiled(selmon->clients); iter; iter = nexttiled(iter->next)) {
     if (iter == c)
       continue;
     if (!ISVISIBLE(iter))
