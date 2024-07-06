@@ -70,7 +70,7 @@ enum { WMProtocols, WMDelete, WMState, WMTakeFocus, WMLast }; /* default atoms *
 enum { ClkTagBar, ClkLtSymbol, ClkStatusText, ClkWinTitle,
        ClkClientWin, ClkRootWin, ClkLast }; /* clicks */
 // DWM internal atoms
-enum {DWMTagMask, DWMSetTagMask, DWMLast};
+enum {DWMTags, DWMOccupiedTags, DWMSetTags, DWMLast};
 
 /* dwm settings */
 static bool debug = false;
@@ -121,6 +121,7 @@ typedef struct {
 } Layout;
 
 typedef struct {
+  int tagnum;
   const Layout *lt;
   float mfact;
   int nmaster;
@@ -148,6 +149,7 @@ struct Monitor {
 	const Layout *lt;
   Tag tags[LENGTH(tags)];
   bool isrighttiled;
+  unsigned int occupiedtags;
 };
 
 typedef struct {
@@ -169,6 +171,7 @@ static void attach(Client *c);
 static void attachbottom(Client *c);
 static void attachstack(Client *c);
 static void buttonpress(XEvent *e);
+static unsigned int calcoccupiedtags(Monitor *m);
 static void checkotherwm(void);
 static void cleanup(void);
 static void cleanupmon(Monitor *mon);
@@ -273,7 +276,10 @@ static void updatetitle(Client *c);
 static void updatewindowtype(Client *c);
 static void updatewmhints(Client *c);
 static void updatedwmtagmaskxprop(void);
+static void updateoccupiedtags(Monitor *m, unsigned int tagmask);
 static void view(const Arg *arg);
+static void viewprev(const Arg *arg);
+static void viewnext(const Arg *arg);
 static Client *wintoclient(Window w);
 static Monitor *wintomon(Window w);
 static int xerror(Display *dpy, XErrorEvent *ee);
@@ -522,6 +528,20 @@ buttonpress(XEvent *e)
 			buttons[i].func(click == ClkTagBar && buttons[i].arg.i == 0 ? &arg : &buttons[i].arg);
 }
 
+unsigned int
+calcoccupiedtags(Monitor *m) {
+  unsigned int occupiedtags = 0;
+  for (Client *c = m->clients; c; c = c->next) {
+    occupiedtags |= c->tags;
+  }
+
+  for (Client *c = m->stack; c; c = c->snext) {
+    occupiedtags |= c->tags;
+  }
+
+  return occupiedtags;
+}
+
 void
 checkotherwm(void)
 {
@@ -709,9 +729,10 @@ createmon(void)
 	m->gappx = gappx;
 	m->lt = &layouts[0];
   for (int i = 0; i < LENGTH(tags); i++) {
-    m->tags[i] = (Tag) {m->lt, m->mfact, m->nmaster, false};
+    m->tags[i] = (Tag) {i, m->lt, m->mfact, m->nmaster, false};
   }
   m->isrighttiled = false;
+  m->occupiedtags = 0;
 	strncpy(m->ltsymbol, layouts[0].symbol, sizeof m->ltsymbol);
 	return m;
 }
@@ -1384,6 +1405,7 @@ manage(Window w, XWindowAttributes *wa)
 	c->mon->sel = c;
 	arrange(c->mon);
 	XMapWindow(dpy, c->win);
+  updateoccupiedtags(c->mon, c->mon->occupiedtags | c->tags);
 	focus(NULL);
 }
 
@@ -1548,9 +1570,9 @@ propertynotify(XEvent *e)
 		}
 		if (ev->atom == netatom[NetWMWindowType])
 			updatewindowtype(c);
-	} else if (ev->window == root && ev->atom == dwmatom[DWMSetTagMask]) {
+	} else if (ev->window == root && ev->atom == dwmatom[DWMSetTags]) {
     unsigned int new_mask;
-    if (gettextprop(root, dwmatom[DWMSetTagMask], stext, sizeof(stext))) {
+    if (gettextprop(root, dwmatom[DWMSetTags], stext, sizeof(stext))) {
       new_mask = (unsigned int)atoi(stext);
       if (new_mask & TAGMASK) {
         selmon->tagset[selmon->seltags] = new_mask & TAGMASK;
@@ -1949,8 +1971,9 @@ setup(void)
 	netatom[NetWMWindowTypeDialog] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DIALOG", False);
 	netatom[NetClientList] = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
 
-  dwmatom[DWMTagMask] = XInternAtom(dpy, "DWM_TAG_MASK", False);
-  dwmatom[DWMSetTagMask] = XInternAtom(dpy, "DWM_SET_TAG_MASK", False);
+  dwmatom[DWMTags] = XInternAtom(dpy, "DWM_TAG_MASK", False);
+  dwmatom[DWMOccupiedTags] = XInternAtom(dpy, "DWM_OCCUPIED_TAG_MASK", False);
+  dwmatom[DWMSetTags] = XInternAtom(dpy, "DWM_SET_TAG_MASK", False);
 	/* init cursors */
 	cursor[CurNormal] = drw_cur_create(drw, XC_left_ptr);
 	cursor[CurResize] = drw_cur_create(drw, XC_sizing);
@@ -1974,9 +1997,14 @@ setup(void)
 	XChangeProperty(dpy, root, netatom[NetSupported], XA_ATOM, 32,
 		PropModeReplace, (unsigned char *) netatom, NetLast);
 	XDeleteProperty(dpy, root, netatom[NetClientList]);
+
   updatedwmtagmaskxprop();
-  XChangeProperty(dpy, root, dwmatom[DWMSetTagMask], utf8string, 8,
+
+  XChangeProperty(dpy, root, dwmatom[DWMOccupiedTags], utf8string, 8, PropModeReplace,(unsigned char *) "0" , 1);
+
+  XChangeProperty(dpy, root, dwmatom[DWMSetTags], utf8string, 8,
                   PropModeReplace,(unsigned char *) "1" , 1);
+
 	/* select events */
 	wa.cursor = cursor[CurNormal]->cursor;
 	wa.event_mask = SubstructureRedirectMask|SubstructureNotifyMask
@@ -2279,6 +2307,7 @@ unmanage(Client *c, int destroyed)
 	free(c);
 	focus(NULL);
 	updateclientlist();
+  updateoccupiedtags(m, calcoccupiedtags(m));
 	arrange(m);
 }
 
@@ -2531,28 +2560,64 @@ updatewmhints(Client *c)
 	}
 }
 
+#define MAX_TAG_MASK_LEN 10
 void
 updatedwmtagmaskxprop(void) {
-  // TODO: remove magic num
-  char dwm_tag_mask_str[11];
+  char dwm_tag_mask_str[MAX_TAG_MASK_LEN+1];
   int strlength;
   strlength = snprintf(dwm_tag_mask_str, sizeof(dwm_tag_mask_str), "%u", selmon->tagset[selmon->seltags]);
-  XChangeProperty(dpy, root, dwmatom[DWMTagMask], utf8string, 8,
+  XChangeProperty(dpy, root, dwmatom[DWMTags], utf8string, 8,
                   PropModeReplace,(unsigned char *) dwm_tag_mask_str , strlength);
 }
 
+void
+updateoccupiedtags(Monitor *m, unsigned int tagmask) {
+  m->occupiedtags = tagmask;
+  char dwm_occupied_tag_mask_str[MAX_TAG_MASK_LEN+1];
+  int strlength;
+  strlength = snprintf(dwm_occupied_tag_mask_str, sizeof(dwm_occupied_tag_mask_str), "%u", tagmask);
+  XChangeProperty(dpy, root, dwmatom[DWMOccupiedTags], utf8string, 8, PropModeReplace,(unsigned char *) dwm_occupied_tag_mask_str , strlength);
+}
+
 void view(const Arg *arg) {
-  if ((arg->ui & TAGMASK) == selmon->tagset[selmon->seltags])
+  if ((arg->ui & TAGMASK) == selmon->tagset[selmon->seltags]) {
     return;
+  }
   selmon->seltags ^= 1; /* toggle sel tagset */
   if (arg->ui & TAGMASK) {
     selmon->tagset[selmon->seltags] = arg->ui & TAGMASK;
     applytag(getdomtag(selmon->tags));
-    updatedwmtagmaskxprop();
   }
-
+  updatedwmtagmaskxprop();
   focus(NULL);
   arrange(selmon);
+}
+
+
+void
+viewprev(const Arg *arg) {
+  Tag *t = getdomtag(selmon->tags);
+  int num = t->tagnum;
+  if (num == 0) {
+    num = LENGTH(tags) - 1;
+  } else {
+    num--;
+  }
+  const Arg args = {.ui = 1 << num};
+  view(&args);
+}
+
+void
+viewnext(const Arg *arg) {
+  Tag *t = getdomtag(selmon->tags);
+  int num = t->tagnum;
+  if (num == LENGTH(tags) - 1) {
+    num = 0;
+  } else {
+    num++;
+  }
+  const Arg args = {.ui = 1 << num};
+  view(&args);
 }
 
 Client *
