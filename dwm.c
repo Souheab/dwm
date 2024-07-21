@@ -243,6 +243,7 @@ static void setgaps(const Arg *arg);
 static void setlayout(const Arg *arg);
 static void setmfact(const Arg *arg);
 static void settopoffset(unsigned int offset);
+static void setbottomoffset(unsigned int offset);
 static void setup(void);
 static void seturgent(Client *c, int urg);
 static void showhide(Client *c);
@@ -1150,7 +1151,6 @@ Client *getleftclient(Client *c) {
 
 Client
 *getrightclient(Client *c) {
-  int targetx = c->x + c->w + gappx + (2*borderpx);
   Client *iter;
   Client *bestCandidate = c;
   int bestYDev = DEVIATION_INIT_CONST; // Best y deviation (least deviation)
@@ -1164,9 +1164,7 @@ Client
   for (iter = nexttiled(selmon->clients); iter; iter = nexttiled(iter->next)) {
     if (iter == c)
       continue;
-    if (!ISVISIBLE(iter))
-      continue;
-    if (iter->x == targetx) {
+    if (iter->x > c->x) {
       yDev = abs(c->y - iter->y);
       printf("ydev: %d", yDev);
 
@@ -1576,6 +1574,7 @@ propertynotify(XEvent *e)
       new_mask = (unsigned int)atoi(stext);
       if (new_mask & TAGMASK) {
         selmon->tagset[selmon->seltags] = new_mask & TAGMASK;
+        updatedwmtagmaskxprop();
         focus(NULL);
         arrange(selmon);
       }
@@ -1923,8 +1922,15 @@ void setmfact(const Arg *arg) {
 
 void
 settopoffset(unsigned int offset) {
-  selmon->wh -= topoffset;
-  selmon->wy += topoffset;
+  selmon->wh -= offset;
+  selmon->wy += offset;
+  arrange(selmon);
+}
+
+
+void
+setbottomoffset(unsigned int offset) {
+  selmon->wh -= offset;
   arrange(selmon);
 }
 
@@ -2138,6 +2144,7 @@ tag(const Arg *arg)
 		selmon->sel->tags = arg->ui & TAGMASK;
 		focus(NULL);
 		arrange(selmon);
+    updateoccupiedtags(selmon, calcoccupiedtags(selmon));
 	}
 }
 
@@ -2222,8 +2229,10 @@ togglefloating(const Arg *arg)
 void
 togglefullscr(const Arg *arg)
 {
-  if(selmon->sel)
+  if(selmon->sel) {
+    selmon->sel->maximized = false;
     setfullscreen(selmon->sel, !selmon->sel->isfullscreen);
+  }
 }
 
 void
@@ -2260,6 +2269,8 @@ toggleview(const Arg *arg)
 void
 togglemaximize(const Arg *arg) {
   selmon->sel->maximized = !(selmon->sel->maximized);
+  if (selmon->sel->isfullscreen)
+    setfullscreen(selmon->sel, 0);
   arrange(selmon);
 }
 
@@ -2718,6 +2729,7 @@ main(int argc, char *argv[])
     logselmoninfo();
   }
   settopoffset(topoffset);
+  setbottomoffset(bottomoffset);
 #ifdef __OpenBSD__
 	if (pledge("stdio rpath proc exec", NULL) == -1)
 		die("pledge");
