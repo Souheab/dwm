@@ -248,6 +248,7 @@ static void setup(void);
 static void seturgent(Client *c, int urg);
 static void showhide(Client *c);
 static void spawn(const Arg *arg);
+static void startup(void);
 static void swapclients(Client *c1, Client *c2);
 static void swapup(const Arg *arg);
 static void swapdown(const Arg *arg);
@@ -2074,6 +2075,14 @@ void spawn(const Arg *arg) {
 }
 
 void
+startup(void) {
+  for (int i = 0; startupcmd[i] != NULL; i++) {
+    const Arg arg = {.v = startupcmd[i]}; 
+    spawn(&arg);
+  }
+}
+
+void
 swapclients(Client *c1, Client *c2) {
   if (c1 == c2)
     return;
@@ -2735,6 +2744,7 @@ main(int argc, char *argv[])
 		die("pledge");
 #endif /* __OpenBSD__ */
 	scan();
+  startup();
 	run();
 	cleanup();
 	XCloseDisplay(dpy);

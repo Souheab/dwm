@@ -52,6 +52,8 @@ static const Layout layouts[] = {
 #define MODKEY Mod4Mask
 #define ALTKEY Mod1Mask
 #define TERMINAL_PROGRAM "wezterm"
+#define BAR_PROGRAM "sgbar"
+
 #define TAGKEYS(KEY,TAG) \
 	{ MODKEY,                       KEY,      view,           {.ui = 1 << TAG} }, \
 	{ MODKEY|ControlMask,           KEY,      toggleview,     {.ui = 1 << TAG} }, \
@@ -63,8 +65,12 @@ static const Layout layouts[] = {
 
 /* commands */
 static char dmenumon[2] = "0"; /* component of dmenucmd, manipulated in spawn() */
+
+// These are null terminated arrays
 static const char *dmenucmd[] = { "dmenu_run", "-m", dmenumon, "-fn", dmenufont, "-nb", col_gray1, "-nf", col_gray3, "-sb", col_cyan, "-sf", col_gray4, NULL };
 static const char *termcmd[]  = { TERMINAL_PROGRAM, NULL };
+static const char *barcmd[] = { BAR_PROGRAM, NULL };
+static const char **startupcmd[] = { barcmd , NULL}; 
 
 static const Key keys[] = {
 	/* modifier                     key        function        argument */
