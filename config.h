@@ -48,6 +48,8 @@ static const Layout layouts[] = {
 #define TILE 0
 #define FLOAT 1
 
+#define HOME_SUB_STR "$HOME_PATH"
+
 /* key definitions */
 #define MODKEY Mod4Mask
 #define ALTKEY Mod1Mask
@@ -70,7 +72,8 @@ static char dmenumon[2] = "0"; /* component of dmenucmd, manipulated in spawn() 
 static const char *dmenucmd[] = { "dmenu_run", "-m", dmenumon, "-fn", dmenufont, "-nb", col_gray1, "-nf", col_gray3, "-sb", col_cyan, "-sf", col_gray4, NULL };
 static const char *termcmd[]  = { TERMINAL_PROGRAM, NULL };
 static const char *barcmd[] = { BAR_PROGRAM, NULL };
-static const char **startupcmd[] = { barcmd , NULL}; 
+static const char *wpcmd[] = {"feh", "--bg-scale", HOME_SUB_STR"/.config/wp.webp"};
+static const char **startupcmd[] = { barcmd, wpcmd, NULL}; 
 
 static const Key keys[] = {
 	/* modifier                     key        function        argument */

@@ -72,6 +72,8 @@ enum { ClkTagBar, ClkLtSymbol, ClkStatusText, ClkWinTitle,
 // DWM internal atoms
 enum {DWMTags, DWMOccupiedTags, DWMSetTags, DWMLast};
 
+static char *homepath = NULL;
+
 /* dwm settings */
 static bool debug = false;
 
@@ -249,6 +251,7 @@ static void seturgent(Client *c, int urg);
 static void showhide(Client *c);
 static void spawn(const Arg *arg);
 static void startup(void);
+static char *strsub(const char *str, const char *sub, const char *replacement);
 static void swapclients(Client *c1, Client *c2);
 static void swapup(const Arg *arg);
 static void swapdown(const Arg *arg);
@@ -2076,10 +2079,65 @@ void spawn(const Arg *arg) {
 
 void
 startup(void) {
+  // Substitute homepath
+  if (homepath != NULL) {
+    for (int i = 0; startupcmd[i] != NULL; i++) {
+      for (int j = 0; startupcmd[i][j] != NULL; j++) {
+        char *subbedstr = NULL;
+        subbedstr = strsub(startupcmd[i][j], HOME_SUB_STR, homepath);
+        if (subbedstr != NULL) {
+          startupcmd[i][j] = subbedstr;
+          printf("replacemt: %s\n",startupcmd[i][j]);
+        }
+      }
+    }
+  }
+
   for (int i = 0; startupcmd[i] != NULL; i++) {
     const Arg arg = {.v = startupcmd[i]}; 
     spawn(&arg);
   }
+}
+
+
+char
+*strsub(const char *str, const char *sub, const char *replacement) {
+  if (!str || !sub || !replacement)
+    return NULL;
+
+  size_t str_len = strlen(str);
+  size_t sub_len = strlen(sub);
+  size_t rep_len = strlen(replacement);
+
+  size_t count = 0;
+  const char *tmp = str;
+  while ((tmp = strstr(tmp, sub)) != NULL) {
+    count++;
+    tmp += sub_len;
+  }
+
+  if (count == 0)
+    return NULL;
+
+  size_t new_len = str_len + count * (rep_len - sub_len) + 1;
+
+  char *result = malloc(new_len);
+  if (result == NULL)
+    return NULL;
+
+  char *curr = result;
+  while (*str) {
+    if (strncmp(str, sub, sub_len) == 0) {
+      strcpy(curr, replacement);
+      curr += rep_len;
+      str += sub_len;
+    } else {
+      *curr++ = *str++;
+    }
+  }
+  *curr = '\0';
+
+  return result;
 }
 
 void
@@ -2744,6 +2802,7 @@ main(int argc, char *argv[])
 		die("pledge");
 #endif /* __OpenBSD__ */
 	scan();
+  homepath = getenv("HOME");
   startup();
 	run();
 	cleanup();
