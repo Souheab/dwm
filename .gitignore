@@ -1,3 +1,4 @@
 *.o
 dwm
 *.tar.gz
+compile_commands.json
