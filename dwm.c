@@ -2081,20 +2081,22 @@ void
 startup(void) {
   // Substitute homepath
   if (homepath != NULL) {
-    for (int i = 0; startupcmd[i] != NULL; i++) {
-      for (int j = 0; startupcmd[i][j] != NULL; j++) {
+    for (int i = 0; startupcmds[i] != NULL; i++) {
+      for (int j = 0; startupcmds[i][j] != NULL; j++) {
         char *subbedstr = NULL;
-        subbedstr = strsub(startupcmd[i][j], HOME_SUB_STR, homepath);
+        subbedstr = strsub(startupcmds[i][j], HOME_SUB_STR, homepath);
         if (subbedstr != NULL) {
-          startupcmd[i][j] = subbedstr;
-          printf("replacemt: %s\n",startupcmd[i][j]);
+          startupcmds[i][j] = subbedstr;
+          printf("replacement: %s\n",startupcmds[i][j]);
         }
       }
     }
+  } else {
+    return;
   }
 
-  for (int i = 0; startupcmd[i] != NULL; i++) {
-    const Arg arg = {.v = startupcmd[i]}; 
+  for (int i = 0; startupcmds[i] != NULL; i++) {
+    const Arg arg = {.v = startupcmds[i]}; 
     spawn(&arg);
   }
 }
