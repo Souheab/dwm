@@ -70,15 +70,16 @@ static char dmenumon[2] = "0"; /* component of dmenucmd, manipulated in spawn() 
 
 // These are null terminated arrays
 static const char *dmenucmd[] = { "dmenu_run", "-m", dmenumon, "-fn", dmenufont, "-nb", col_gray1, "-nf", col_gray3, "-sb", col_cyan, "-sf", col_gray4, NULL };
+static const char *applaunchercmd[] = { "rofi", "-show", "drun", NULL };
 static const char *termcmd[]  = { TERMINAL_PROGRAM, NULL };
 static const char *barcmd[] = { BAR_PROGRAM, NULL };
-static const char *wpcmd[] = {"feh", "--bg-scale", HOME_SUB_STR"/.config/wp.webp", NULL};
-static const char *startupscriptcmd[] = {"sh", HOME_SUB_STR"/.config/dwm/startup.sh", NULL}; 
+static const char *wpcmd[] = { "feh", "--bg-scale", HOME_SUB_STR"/.config/wp.webp", NULL };
+static const char *startupscriptcmd[] = { "sh", HOME_SUB_STR"/.config/dwm/startup.sh", NULL }; 
 static const char **startupcmds[] = { startupscriptcmd, barcmd, wpcmd, NULL };
 
 static const Key keys[] = {
 	/* modifier                     key        function        argument */
-	{ MODKEY,                       XK_p,      spawn,          {.v = dmenucmd } },
+	{ MODKEY,                       XK_p,      spawn,          {.v = applaunchercmd } },
 	{ MODKEY,                       XK_Return, spawn,          {.v = termcmd } },
 	/* { MODKEY,                       XK_b,      togglebar,      {0} }, */
 	{ MODKEY,                       XK_Tab,    focusstack,     {.i = +1 } },
