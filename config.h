@@ -75,7 +75,7 @@ static const char *termcmd[]  = { TERMINAL_PROGRAM, NULL };
 static const char *barcmd[] = { BAR_PROGRAM, NULL };
 static const char *wpcmd[] = { "feh", "--bg-scale", HOME_SUB_STR"/.config/dwm/wp.jpg", NULL };
 static const char *startupscriptcmd[] = { "sh", HOME_SUB_STR"/.config/dwm/startup.sh", NULL }; 
-static const char **startupcmds[] = { startupscriptcmd, barcmd, wpcmd, NULL };
+static const char **startupcmds[] = { startupscriptcmd, NULL };
 
 static const Key keys[] = {
 	/* modifier                     key        function        argument */
