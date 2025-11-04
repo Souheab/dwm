@@ -1355,6 +1355,23 @@ manage(Window w, XWindowAttributes *wa)
 	Client *c, *t = NULL;
 	Window trans = None;
 	XWindowChanges wc;
+	Atom wtype;
+	int di;
+	unsigned long dl;
+	unsigned char *p = NULL;
+	Atom da;
+
+	/* Check if this is a dock window before managing */
+	if (XGetWindowProperty(dpy, w, netatom[NetWMWindowType], 0L, sizeof(Atom), False, XA_ATOM,
+		&da, &di, &dl, &dl, &p) == Success && p) {
+		wtype = *(Atom *)p;
+		XFree(p);
+		if (wtype == netatom[NetWMWindowTypeDock]) {
+			/* Don't manage dock windows - just map them */
+			XMapWindow(dpy, w);
+			return;
+		}
+	}
 
 	c = ecalloc(1, sizeof(Client));
 	c->win = w;
@@ -2620,10 +2637,6 @@ updatewindowtype(Client *c)
 		setfullscreen(c, 1);
 	if (wtype == netatom[NetWMWindowTypeDialog])
 		c->isfloating = 1;
-	if (wtype == netatom[NetWMWindowTypeDock]) {
-		c->isfloating = 1;
-		c->tags = 0;
-	}
 }
 
 void
